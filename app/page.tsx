@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { FAQ } from "@/components/FAQ";
 import { CategoryCard } from "@/components/CategoryCard";
 import { Hero } from "@/components/Hero";
@@ -17,6 +18,9 @@ import {
 } from "@/lib/catalogue";
 
 export default async function HomePage() {
+  // The homepage is assembled from live catalogue data and should not query
+  // Postgres as part of static prerendering during deployment.
+  await connection();
   const [featured, bestSellers, newArrivals, categories] =
     await Promise.all([
       getFeaturedProducts(8),

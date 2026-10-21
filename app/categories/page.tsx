@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { CategoryCard } from "@/components/CategoryCard";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -11,6 +12,9 @@ export const metadata: Metadata = {
 };
 
 export default async function CategoriesPage() {
+  // The catalogue is live Postgres data, so resolve it for each request rather
+  // than trying to snapshot it during the deployment build.
+  await connection();
   const categories = await getCategoriesWithStats();
 
   return (

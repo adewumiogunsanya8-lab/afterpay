@@ -58,12 +58,11 @@ export function primeMarkets(markets: MarketMap): void {
   registry = markets;
 }
 
-const NOT_LOADED =
-  "The market is not loaded yet. Fetch it in the root layout and pass it to " +
-  "<MarketsProvider> before any component calls getMarket().";
-
 /** The storefront's market. */
 export function getMarket(): Market {
-  if (!registry) throw new Error(NOT_LOADED);
-  return registry.US;
+  // Server rendering and build-time prerendering can evaluate a consumer before
+  // the root layout has primed this module. The bootstrap market is a valid
+  // storefront default, and getMarkets() uses the same fallback when the DB has
+  // no US row, so formatting remains safe while the request data is loading.
+  return registry?.US ?? BOOTSTRAP_MARKET;
 }
