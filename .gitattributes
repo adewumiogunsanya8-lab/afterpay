@@ -1,0 +1,13 @@
+# Normalise line endings in the repository.
+#
+# Several source files picked up CRLF from tooling on Windows, which made
+# exact-match edits and (more seriously) left a UTF-8 BOM inside
+# prisma/migrations/*.sql - PostgreSQL rejects a BOM as a syntax error.
+# Checking the sources in as LF keeps one file per format in the working tree.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary

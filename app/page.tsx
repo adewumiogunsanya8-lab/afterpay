@@ -1,69 +1,124 @@
-import Image from "next/image";
+import Link from "next/link";
+import { FAQ } from "@/components/FAQ";
+import { CategoryCard } from "@/components/CategoryCard";
+import { Hero } from "@/components/Hero";
+import {
+  AboutSection,
+  PayLaterSteps,
+  WhyAfterPay,
+} from "@/components/MarketingSections";
+import { ProductGrid } from "@/components/ProductGrid";
+import { SectionHeader } from "@/components/SectionHeader";
+import {
+  getBestSellers,
+  getCategoriesWithStats,
+  getFeaturedProducts,
+  getNewArrivals,
+} from "@/lib/catalogue";
 
-export default function Home() {
+export default async function HomePage() {
+  const [featured, bestSellers, newArrivals, categories] =
+    await Promise.all([
+      getFeaturedProducts(8),
+      getBestSellers(8),
+      getNewArrivals(8),
+      getCategoriesWithStats(),
+    ]);
+  const popularCategories = categories.slice(0, 8);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <>
+      <Hero />
+
+      <section className="container-page section">
+        <SectionHeader
+          eyebrow="Handpicked"
+          title="Featured products"
+          description="Favourites across every category, each with a monthly figure shown next to the price."
+          action={{ label: "Browse all products", href: "/search" }}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+        <ProductGrid products={featured} />
+      </section>
+
+      <section className="bg-surface py-10 sm:py-14">
+        <div className="container-page">
+          <SectionHeader
+            eyebrow="Popular categories"
+            title="Shop by category"
+            description="Browse the full catalogue by category."
+            action={{ label: "All categories", href: "/categories" }}
+          />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+            {popularCategories.map((category) => (
+              <CategoryCard key={category.slug} category={category} />
+            ))}
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      <section className="container-page section">
+        <SectionHeader
+          eyebrow="Most bought"
+          title="Best sellers"
+          description="The products shoppers add to cart most often."
+          action={{ label: "See best sellers", href: "/search?sort=rating" }}
+        />
+        <ProductGrid products={bestSellers} />
+      </section>
+
+      <section className="bg-surface py-10 sm:py-14">
+        <div className="container-page">
+          <SectionHeader
+            eyebrow="Just landed"
+            title="New arrivals"
+            description="Recently added to the catalogue."
+            action={{ label: "See new arrivals", href: "/search?sort=newest" }}
+          />
+          <ProductGrid products={newArrivals} />
         </div>
-      </main>
-    </div>
+      </section>
+
+      <section className="bg-surface py-10 sm:py-14">
+        <div className="container-page">
+          <PayLaterSteps />
+        </div>
+      </section>
+
+      <section className="container-page section">
+        <WhyAfterPay />
+      </section>
+
+      <section className="container-page section">
+        <AboutSection />
+      </section>
+
+      <section className="container-page section pt-0">
+        <SectionHeader
+          eyebrow="Questions"
+          title="Frequently asked questions"
+          description="Everything you need to know, answered plainly."
+        />
+        <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+          <div id="faq" className="scroll-mt-24">
+            <FAQ />
+          </div>
+          <div className="card h-fit p-5">
+            <h3 className="text-base font-semibold text-ink-950">Still have questions?</h3>
+            <p className="mt-2 text-sm leading-relaxed text-ink-600">
+              Browse the catalogue, compare products, and review delivery details before
+              confirming your order.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link href="/categories" className="btn btn-primary">
+                Start shopping
+              </Link>
+              <Link href="/search?q=laptop" className="btn btn-secondary">
+                Try a search
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
