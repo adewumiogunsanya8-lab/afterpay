@@ -115,6 +115,13 @@ export function CheckoutFlow() {
       return;
     }
 
+    if (result.paymentUrl) {
+      // Hand off to Pay4Work's hosted payment page. Cart is cleared once
+      // payment succeeds (see /payment/success).
+      window.location.href = result.paymentUrl;
+      return;
+    }
+
     setOrder({
       reference: result.reference,
       placedAt: new Date().toISOString(),

@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/db";
 import { round2 } from "@/lib/format";
+import { headers } from "next/headers";
+
+import { createPay4WorkOrder } from "@/lib/pay4work";
 import type {
   CountryCode,
   CurrencyCode,
@@ -36,7 +39,7 @@ export type PlaceOrderInput = {
 };
 
 export type PlaceOrderResult =
-  | { ok: true; reference: string }
+  | { ok: true; reference: string; paymentUrl?: string }
   | { ok: false; error: string };
 
 /** Human-facing reference, e.g. `FBX-9K2M4QX`. */
@@ -47,6 +50,26 @@ function buildReference(): string {
     suffix += alphabet[Math.floor(Math.random() * alphabet.length)];
   }
   return `FBX-${suffix}`;
+}
+
+async function getBaseUrl(): Promise<string> {
+  try {
+    const h = await headers();
+    const host = h.get("host");
+    if (host) {
+      const proto =
+        h.get("x-forwarded-proto") ??
+        (process.env.NODE_ENV === "production" ? "https" : "http");
+      return `${proto}://${host}`;
+    }
+  } catch {
+    // headers() may not be available outside a request context.
+  }
+  return (
+    process.env.PAY4WORK_BASE_URL ??
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    "http://localhost:3000"
+  );
 }
 
 export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResult> {
@@ -234,7 +257,39 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
       }
     });
 
-    return { ok: true, reference };
+    // Hand the order off to Pay4Work so the customer can complete payment.
+    // The reference doubles as the external order id so webhooks can map
+    // back to this order.
+    let paymentUrl: string | undefined;
+    try {
+      const baseUrl = await getBaseUrl();
+      const pay4workOrder = await createPay4WorkOrder({
+        amount: total,
+        currency: "USD",
+        externalOrderId: reference,
+        customer: {
+          name: `${input.firstName} ${input.lastName}`.trim(),
+          email: input.email,
+          phone: input.phone,
+        },
+        successUrl: `${baseUrl}/payment/success?reference=${encodeURIComponent(
+          reference,
+        )}`,
+        failureUrl: `${baseUrl}/payment/failure?reference=${encodeURIComponent(
+          reference,
+        )}`,
+        metadata: { reference, marketCode: input.marketCode },
+      });
+      paymentUrl = pay4workOrder.paymentPageUrl;
+    } catch (error) {
+      console.error("Pay4Work order creation failed", error);
+      return {
+        ok: false,
+        error: "We could not start the payment. Please try again.",
+      };
+    }
+
+    return { ok: true, reference, paymentUrl };
   } catch (error) {
     console.error("placeOrder failed", error);
     return { ok: false, error: "We could not save your order. Please try again." };

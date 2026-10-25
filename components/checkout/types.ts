@@ -76,10 +76,17 @@ export function validateStep(step: StepId, data: CheckoutData): string[] {
     ["ZIP / postcode", data.postcode.trim().length > 2],
   ];
 
-  if (step === "contact" || step === "address" || step === "review" || step === "confirmation") {
-    for (const [label, valid] of required) {
-      if (!valid) errors.push(`${label} is required.`);
-    }
+  const checks =
+    step === "contact"
+      ? required.slice(0, 3)
+      : step === "address"
+        ? required.slice(3)
+        : step === "review" || step === "confirmation"
+          ? required
+          : [];
+
+  for (const [label, valid] of checks) {
+    if (!valid) errors.push(`${label} is required.`);
   }
 
   return errors;
