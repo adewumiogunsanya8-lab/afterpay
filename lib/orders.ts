@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { round2 } from "@/lib/format";
 import { headers } from "next/headers";
 
-import { createPay4WorkOrder } from "@/lib/pay4work";
+import { createFlutterwavePayment } from "@/lib/flutterwave";
 import type {
   CountryCode,
   CurrencyCode,
@@ -66,9 +66,7 @@ async function getBaseUrl(): Promise<string> {
     // headers() may not be available outside a request context.
   }
   return (
-    process.env.PAY4WORK_BASE_URL ??
-    process.env.NEXT_PUBLIC_SITE_URL ??
-    "http://localhost:3000"
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
   );
 }
 
@@ -257,32 +255,28 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
       }
     });
 
-    // Hand the order off to Pay4Work so the customer can complete payment.
-    // The reference doubles as the external order id so webhooks can map
-    // back to this order.
+    // Hand the order off to Flutterwave so the customer can complete payment.
+    // The reference doubles as the tx_ref so webhooks can map back to this order.
     let paymentUrl: string | undefined;
     try {
       const baseUrl = await getBaseUrl();
-      const pay4workOrder = await createPay4WorkOrder({
+      const flutterwavePayment = await createFlutterwavePayment({
         amount: total,
         currency: "USD",
-        externalOrderId: reference,
+        txRef: reference,
         customer: {
           name: `${input.firstName} ${input.lastName}`.trim(),
           email: input.email,
           phone: input.phone,
         },
-        successUrl: `${baseUrl}/payment/success?reference=${encodeURIComponent(
+        redirectUrl: `${baseUrl}/payment/success?reference=${encodeURIComponent(
           reference,
         )}`,
-        failureUrl: `${baseUrl}/payment/failure?reference=${encodeURIComponent(
-          reference,
-        )}`,
-        metadata: { reference, marketCode: input.marketCode },
+        meta: { reference, marketCode: input.marketCode },
       });
-      paymentUrl = pay4workOrder.paymentPageUrl;
+      paymentUrl = flutterwavePayment.link;
     } catch (error) {
-      console.error("Pay4Work order creation failed", error);
+      console.error("Flutterwave payment creation failed", error);
       return {
         ok: false,
         error: "We could not start the payment. Please try again.",
