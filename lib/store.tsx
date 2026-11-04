@@ -50,6 +50,12 @@ export type CartLine = {
   quantity: number;
 };
 
+/** A shopper's chosen payment plan for a single cart line / product. */
+export type PaymentSelection = {
+  choice: "full" | "installments";
+  months: number;
+};
+
 export function toCartProduct(product: Product): CartProduct {
   return {
     id: product.id,
@@ -137,6 +143,25 @@ const cartStore = createPersistentStore<CartLine[]>(CART_STORAGE_KEY, (raw) => {
   }
 }, []);
 
+const PAYMENT_SELECTIONS_STORAGE_KEY = "afterpay.paymentSelections.v1";
+
+const paymentSelectionsStore = createPersistentStore<Record<string, PaymentSelection>>(
+  PAYMENT_SELECTIONS_STORAGE_KEY,
+  (raw) => {
+    if (!raw) return {};
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, PaymentSelection>;
+      }
+      return {};
+    } catch {
+      return {};
+    }
+  },
+  {},
+);
+
 type StoreValue = {
   market: Market;
   lines: CartLine[];
@@ -145,6 +170,8 @@ type StoreValue = {
   setQuantity: (productId: string, quantity: number) => void;
   removeItem: (productId: string) => void;
   clearCart: () => void;
+  paymentSelections: Record<string, PaymentSelection>;
+  setPaymentSelection: (productId: string, selection: PaymentSelection) => void;
   quantityOf: (productId: string) => number;
   isCartEmpty: boolean;
   cartOpen: boolean;
@@ -170,6 +197,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     cartStore.subscribe,
     cartStore.getSnapshot,
     cartStore.getServerSnapshot,
+  );
+  const paymentSelections = useSyncExternalStore(
+    paymentSelectionsStore.subscribe,
+    paymentSelectionsStore.getSnapshot,
+    paymentSelectionsStore.getServerSnapshot,
   );
   const hydrated = useHydrated();
   const [cartOpen, setCartOpen] = useState(false);
@@ -214,6 +246,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const removeItem = useCallback((productId: string) => {
     cartStore.set(cartStore.getSnapshot().filter((line) => line.product.id !== productId));
+    const current = paymentSelectionsStore.getSnapshot();
+    if (!(productId in current)) return;
+    const updated = { ...current };
+    delete updated[productId];
+    paymentSelectionsStore.set(updated);
+  }, []);
+
+  const setPaymentSelection = useCallback((productId: string, selection: PaymentSelection) => {
+    const current = paymentSelectionsStore.getSnapshot();
+    paymentSelectionsStore.set({ ...current, [productId]: selection });
   }, []);
 
   const clearCart = useCallback(() => cartStore.set([]), []);
@@ -232,6 +274,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setQuantity,
       removeItem,
       clearCart,
+      paymentSelections,
+      setPaymentSelection,
       quantityOf,
       isCartEmpty: lines.length === 0,
       cartOpen,
@@ -245,6 +289,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setQuantity,
       removeItem,
       clearCart,
+      paymentSelections,
+      setPaymentSelection,
       quantityOf,
       cartOpen,
       hydrated,

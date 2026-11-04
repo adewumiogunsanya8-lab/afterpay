@@ -65,7 +65,7 @@ export function ReviewStep({
                     {selection.choice === "installments"
                       ? `${selection.months} monthly payments of ${formatMoney(
                           lineTotal / selection.months,
-                        )}`
+                        )} · ${formatMoney(lineTotal)} total`
                       : `Pay in full · ${formatMoney(lineTotal)}`}
                   </span>
                 </li>

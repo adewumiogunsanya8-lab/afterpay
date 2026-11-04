@@ -373,7 +373,11 @@ export function CheckoutFlow() {
                 );
               })}
             </ul>
-            <CartTotals lines={lines} method={data.method} />
+            <CartTotals
+              lines={lines}
+              method={data.method}
+              paymentSelections={data.paymentSelections}
+            />
           </div>
 
         </aside>

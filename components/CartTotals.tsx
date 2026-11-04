@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { TruckIcon } from "@/components/Icons";
 import { calculateTotals, type ShippingMethodId } from "@/lib/fulfilment";
 import { formatMoney } from "@/lib/format";
-import { useStore, type CartLine } from "@/lib/store";
+import { useStore, type CartLine, type PaymentSelection } from "@/lib/store";
 import { cn } from "@/lib/cn";
 
 /**
@@ -17,19 +17,37 @@ export function CartTotals({
   className,
   showAction = true,
   action,
+  paymentSelections,
 }: {
   lines: CartLine[];
   method?: ShippingMethodId;
   className?: string;
   showAction?: boolean;
   action?: ReactNode;
+  /** Per-product payment plan selections. Falls back to the cart store. */
+  paymentSelections?: Record<string, PaymentSelection>;
 }) {
-  const { market } = useStore();
+  const { market, paymentSelections: storeSelections } = useStore();
+  const selections = paymentSelections ?? storeSelections;
 
-  const subtotal = lines.reduce(
-    (sum, line) => sum + line.product.price * line.quantity,
-    0,
-  );
+  /**
+   * Plan-aware subtotal: the sum of each line's selected payment-plan amount.
+   * Pay-in-full lines contribute their full price; installment lines contribute
+   * their per-month amount (line total ÷ months). Defaults (all pay-in-full)
+   * behave exactly as before.
+   */
+  const planSubtotal = lines.reduce((sum, line) => {
+    const selection = selections[line.product.id] ?? {
+      choice: "full",
+      months: 0,
+    };
+    const lineTotal = line.product.price * line.quantity;
+    if (selection.choice === "installments" && selection.months > 0) {
+      return sum + lineTotal / selection.months;
+    }
+    return sum + lineTotal;
+  }, 0);
+
   const savings = lines.reduce(
     (sum, line) =>
       sum +
@@ -38,7 +56,7 @@ export function CartTotals({
   );
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
 
-  const totals = calculateTotals({ subtotal, savings, itemCount, method });
+  const totals = calculateTotals({ subtotal: planSubtotal, savings, itemCount, method });
 
   return (
     <div className={cn("space-y-4", className)}>

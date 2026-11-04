@@ -1,21 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { MinusIcon, PlusIcon, TrashIcon } from "@/components/Icons";
+import { CheckIcon, MinusIcon, PlusIcon, TrashIcon } from "@/components/Icons";
 import { ProductImage } from "@/components/ProductImage";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
-import { useStore, type CartLine } from "@/lib/store";
+import { useStore, type CartLine, type PaymentSelection } from "@/lib/store";
 
 /** A single cart row with quantity stepper and remove control. */
 export function CartItem({ line }: { line: CartLine }) {
-  const { setQuantity, removeItem } = useStore();
+  const { setQuantity, removeItem, paymentSelections, setPaymentSelection } = useStore();
   const { product, quantity } = line;
   const unit = product.price;
   const lineTotal = unit * quantity;
-  const monthly = product.installment.eligible
-    ? lineTotal / product.installment.suggestedMonths
-    : null;
+  const installment = product.installment;
+  const eligible = installment.eligible && lineTotal >= installment.minAmountUsd;
+  const periods = installment.availableMonths.filter(
+    (months) => Number.isInteger(months) && months > 0,
+  );
+  const selection: PaymentSelection = paymentSelections[product.id] ?? {
+    choice: "full",
+    months: 0,
+  };
+  const options = [
+    { choice: "full" as const, months: 0, label: "Pay in full" },
+    ...(eligible
+      ? periods.map((months) => ({
+          choice: "installments" as const,
+          months,
+          label: `${months} months`,
+        }))
+      : []),
+  ];
+  const isSelected = (option: (typeof options)[number]) =>
+    selection.choice === option.choice && selection.months === option.months;
+  const monthly =
+    selection.choice === "installments" && selection.months > 0
+      ? lineTotal / selection.months
+      : null;
 
   return (
     <li className="flex gap-3 py-4">
@@ -45,9 +67,36 @@ export function CartItem({ line }: { line: CartLine }) {
           </p>
         </div>
 
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {options.map((option) => {
+            const active = isSelected(option);
+            return (
+              <button
+                key={`${option.choice}-${option.months}`}
+                type="button"
+                onClick={() =>
+                  setPaymentSelection(product.id, {
+                    choice: option.choice,
+                    months: option.months,
+                  })
+                }
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[0.6875rem] transition",
+                  active
+                    ? "border-brand-600 bg-brand-50 text-brand-700"
+                    : "border-line bg-white text-ink-600 hover:border-brand-300",
+                )}
+              >
+                {option.label}
+                {active ? <CheckIcon className="h-3 w-3" /> : null}
+              </button>
+            );
+          })}
+        </div>
+
         {monthly !== null ? (
-          <p className="text-xs font-medium text-mint-700">
-            or {formatMoney(monthly)}/month × {product.installment.suggestedMonths}
+          <p className="mt-1 text-xs font-medium text-mint-700">
+            {selection.months} monthly payments of {formatMoney(monthly)}
           </p>
         ) : null}
 
