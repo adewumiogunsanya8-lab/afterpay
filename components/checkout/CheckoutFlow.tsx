@@ -281,34 +281,93 @@ export function CheckoutFlow() {
             </h2>
             <ul className="mb-4 max-h-64 space-y-3 overflow-y-auto">
               {lines.map((line) => {
-                const selection = data.paymentSelections[line.product.id] ?? {
-                  choice: "full" as const,
-                  months: 0,
-                };
-                const lineTotal = line.product.price * line.quantity;
+                const product = line.product;
+                const lineTotal = product.price * line.quantity;
+                const selection =
+                  data.paymentSelections[product.id] ?? {
+                    choice: "full" as const,
+                    months: 0,
+                  };
+                const eligible =
+                  product.installment.eligible &&
+                  lineTotal >= product.installment.minAmountUsd;
+                const periods = product.installment.availableMonths.filter(
+                  (months) => Number.isInteger(months) && months > 0,
+                );
+                const options = [
+                  { choice: "full" as const, months: 0, label: "Pay in full" },
+                  ...(eligible
+                    ? periods.map((months) => ({
+                        choice: "installments" as const,
+                        months,
+                        label: `${months} months`,
+                      }))
+                    : []),
+                ];
+
+                const isSelected = (option: (typeof options)[number]) =>
+                  selection.choice === option.choice &&
+                  selection.months === option.months;
 
                 return (
-                  <li key={line.product.id} className="flex items-center gap-3">
-                    <ProductImage
-                      src={line.product.image}
-                      alt=""
-                      className="h-14 w-16 shrink-0 rounded-lg"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium text-ink-900">{line.product.name}</p>
-                      <p className="text-[0.6875rem] text-ink-500">
-                        Qty {line.quantity} · {formatMoney(line.product.price)}
-                      </p>
-                      <p className="mt-0.5 text-[0.6875rem] text-ink-600">
-                        {selection.choice === "installments"
-                          ? `${selection.months} monthly payments of ${formatMoney(
-                              lineTotal / selection.months,
-                            )}`
-                          : "Pay in full"}
+                  <li key={product.id} className="flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <ProductImage
+                          src={product.image}
+                          alt=""
+                          className="h-12 w-14 shrink-0 rounded-lg"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-medium text-ink-900">
+                            {product.name}
+                          </p>
+                          <p className="text-[0.6875rem] text-ink-500">
+                            Qty {line.quantity} · {formatMoney(product.price)}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-xs font-semibold tabular-nums text-ink-900">
+                        {formatMoney(lineTotal)}
                       </p>
                     </div>
-                    <p className="text-xs font-semibold tabular-nums text-ink-900">
-                      {formatMoney(lineTotal)}
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {options.map((option) => {
+                        const active = isSelected(option);
+                        return (
+                          <button
+                            key={`${option.choice}-${option.months}`}
+                            type="button"
+                            onClick={() =>
+                              update({
+                                paymentSelections: {
+                                  ...data.paymentSelections,
+                                  [product.id]: {
+                                    choice: option.choice,
+                                    months: option.months,
+                                  },
+                                },
+                              })
+                            }
+                            className={cn(
+                              "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[0.6875rem] transition",
+                              active
+                                ? "border-brand-600 bg-brand-50 text-brand-700"
+                                : "border-line bg-white text-ink-600 hover:border-brand-300",
+                            )}
+                          >
+                            {option.label}
+                            {active ? <CheckIcon className="h-3 w-3" /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-0.5 text-[0.6875rem] text-ink-600">
+                      {selection.choice === "installments"
+                        ? `${selection.months} monthly payments of ${formatMoney(
+                            lineTotal / selection.months,
+                          )}`
+                        : "Pay in full"}
                     </p>
                   </li>
                 );
