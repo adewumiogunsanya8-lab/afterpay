@@ -110,7 +110,10 @@ export function CheckoutFlow() {
     });
 
     if (!result.ok) {
-      setErrors([result.error]);
+      const detail = result.flutterwaveError
+        ? ` (Flutterwave: ${result.flutterwaveError})`
+        : "";
+      setErrors([`${result.error}${detail}`]);
       setSubmitting(false);
       return;
     }

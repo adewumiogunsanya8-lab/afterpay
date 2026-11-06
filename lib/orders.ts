@@ -40,7 +40,7 @@ export type PlaceOrderInput = {
 
 export type PlaceOrderResult =
   | { ok: true; reference: string; paymentUrl?: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; flutterwaveError?: string };
 
 /** Human-facing reference, e.g. `FBX-9K2M4QX`. */
 function buildReference(): string {
@@ -259,27 +259,66 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
     // The reference doubles as the tx_ref so webhooks can map back to this order.
     let paymentUrl: string | undefined;
     try {
+      // Pre-flight validation of required Flutterwave parameters.
+      if (!total || total <= 0) {
+        return {
+          ok: false,
+          error: "Order total must be greater than zero.",
+        };
+      }
+      if (!input.email) {
+        return {
+          ok: false,
+          error: "Customer email is required to start payment.",
+        };
+      }
+
       const baseUrl = await getBaseUrl();
       const flutterwavePayment = await createFlutterwavePayment({
         amount: total,
         currency: "USD",
         txRef: reference,
         customer: {
-          name: `${input.firstName} ${input.lastName}`.trim(),
+          name: `${input.firstName} ${input.lastName}`.trim() || "Customer",
           email: input.email,
-          phone: input.phone,
+          phone: input.phone || undefined,
         },
         redirectUrl: `${baseUrl}/payment/success?reference=${encodeURIComponent(
           reference,
         )}`,
+        customizations: {
+          title: process.env.FLUTTERWAVE_CHECKOUT_TITLE ?? "Easyvend Payment",
+          description: "Complete your order payment",
+          ...(process.env.FLUTTERWAVE_CHECKOUT_LOGO && {
+            logo: process.env.FLUTTERWAVE_CHECKOUT_LOGO,
+          }),
+        },
+        configuration: {
+          sessionDuration:
+            process.env.FLUTTERWAVE_SESSION_DURATION !== undefined
+              ? Number(process.env.FLUTTERWAVE_SESSION_DURATION)
+              : 30,
+          maxRetryAttempt:
+            process.env.FLUTTERWAVE_MAX_RETRY_ATTEMPT !== undefined
+              ? Number(process.env.FLUTTERWAVE_MAX_RETRY_ATTEMPT)
+              : 5,
+        },
+        paymentOptions: "card, banktransfer, ussd",
         meta: { reference, marketCode: input.marketCode },
       });
       paymentUrl = flutterwavePayment.link;
     } catch (error) {
-      console.error("Flutterwave payment creation failed", error);
+      const flutterwaveError =
+        error instanceof Error ? error.message : String(error);
+      console.error(
+        "Flutterwave payment creation failed",
+        flutterwaveError,
+        error instanceof Error ? error.stack : "",
+      );
       return {
         ok: false,
-        error: "We could not start the payment. Please try again.",
+        error: `We could not start the payment: ${flutterwaveError}. Please try again.`,
+        flutterwaveError,
       };
     }
 
